@@ -1,0 +1,76 @@
+# This program runs "make --dry-run" then processes the output to create a visual studio code
+# c_cpp_properties.json file
+
+import json
+import os
+import re
+
+includePath = set()
+defines = set()
+otherOptions = set()
+doubleDash = set()
+outputJson = dict()
+
+# Take a line from the make output
+# split the line into a list by using whitespace
+# search the list for tokens of
+# -I (gcc include)
+# -D (gcc #define)
+# -- (I actually ignore these but I was curious what they all were)
+# - (other - options which I keep track of ... but then ignore)
+
+def processLine(lineData):
+    linelist = lineData.split()
+    for i in linelist:
+        if(i[:2] == "-I"):
+            if(i[2:2] == '/'):
+                includePath.add(i[2:])
+            else:
+                includePath.add(f"/usr/src/linux-headers-{kernelVersion}/{i[2:]}")
+        elif (i[:2] == "-D"):
+            defines.add(i[2:])
+        elif (i[:2] == "--"):
+            doubleDash.add(i)
+        elif (i[:1] == '-'):
+            otherOptions.add(i)
+
+# figure out which version of the kernel we are using
+stream = os.popen('uname -r')
+kernelVersion = stream.read()
+# get rid of the \n from the uname command
+kernelVersion = kernelVersion[:-1]
+
+# run make to find #defines and -I includes
+stream = os.popen('make --dry-run')
+outstring = stream.read()
+lines = outstring.split('\n')
+
+
+for i in lines:
+    # look for a line with " CC "... this is a super ghetto method
+    val = re.compile(r'\s+CC\s+').search(i)
+    if val:
+        processLine(i)
+
+
+# Create the JSON 
+outputJson["configurations"] = []
+
+configDict = {"name" : "Linux"}
+configDict["includePath"] = list(includePath)
+configDict["defines"] = list(defines)
+configDict["intelliSenseMode"] = "gcc-x64"
+configDict["compilerPath"]= "/usr/bin/gcc"
+configDict["cStandard"]= "c11"
+configDict["cppStandard"] = "c++17"
+
+outputJson["configurations"].append(configDict)
+outputJson["version"] = 4
+
+# Convert the Dictonary to a string of JSON
+jsonMsg = json.dumps(outputJson)
+
+# Save the JSON to the files
+outF = open("c_cpp_properties.json", "w")
+outF.write(jsonMsg)
+outF.close()
