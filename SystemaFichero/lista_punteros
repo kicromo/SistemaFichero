@@ -1,0 +1,8 @@
+typedef struct super_block *T_super_block;
+
+typedef struct inode *T_inode;
+
+typedef struct dentry *T_dentry;
+
+typedef struct file * T_file;
+

@@ -1,0 +1,17 @@
+
+{
+  struct inode *inode;
+
+  inode = kmalloc(sizeof(struct inode), GFP_KERNEL);
+  if (!inode)
+    return NULL;
+
+  memset(inode, 0, sizeof(struct inode));
+
+  inode->i_sb = sb;
+  inode->i_state = 0;
+
+  return inode;
+}
+
+Esta función es una función de asignación de nodo. Está diseñada para asignar un nuevo nodo a un superbloque dado. La función comienza creando un nuevo nodo usando la función kmalloc () para asignar memoria para el nuevo nodo. Luego, se llena el nuevo nodo con ceros usando la función memset (). Finalmente, se establece el puntero i_sb del nuevo nodo en el superbloque pasado como argumento y se devuelve el puntero al nuevo nodo.
