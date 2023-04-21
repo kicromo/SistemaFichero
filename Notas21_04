@@ -1,0 +1,10 @@
+ls -l /dev/z*
+
+dd if=/dev/zero of=myfs count=100000 -> 512 (bloques) * 100000
+
+mkfs.msdos myfs 	->	formateado con FAT
+
+sudo losetup /dev/loop999 myfs
+
+para darle permisos de grupo hacemos:
+sudo chmod 666 loop888 (en el nuevo filysistem creado)
