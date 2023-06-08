@@ -1,0 +1,58 @@
+#include<stddef.h>
+
+
+#define MAX_FILENAME_LEN    15
+#define MAX_FILE_DESCRIPTOR 32
+#define MAX_FILE            64
+
+typedef enum { false, true } bool;
+
+typedef struct
+{
+    // información de directorio
+    int dir_index;
+    int dir_len;
+
+    // información de datos
+    int data_index;
+} super_block;
+
+//informacion de fichero
+typedef struct
+{
+    bool used;                   // fichero en uso
+    char name[MAX_FILENAME_LEN]; 
+    int size;                    
+    int head;                    // primer bloque
+    int num_blocks;              
+    int fd_count;                // numero de descriptores de fichero que lo usan
+} file_info;
+
+/* file descriptor */
+typedef struct
+{
+    bool used;                   // descriptor de fichero en uso
+    char file;                   // indice del fichero
+    int offset;             // offset de lectura
+} file_descriptor;
+
+int make_fs(char *disk_name);
+int mount_fs(char *disk_name);
+int umount_fs(char *disk_name);
+int fs_open(char *name);
+int fs_close(int fildes);
+int fs_create(char *name);
+int fs_delete(char *name);
+int fs_read(int fildes, void *buf, size_t nbyte);
+int fs_write(int fildes, void *buf, size_t nbyte);
+int fs_get_filesize(int fildes);
+int fs_lseek(int fildes, off_t offset);
+int fs_truncate(int fildes, off_t length);
+
+//funciones auxiliares
+char find_file(char* name);
+int find_free_file_des(char file_index);
+int find_free_block(char file_index);
+int find_next_block(int current, char file_index);
+
+

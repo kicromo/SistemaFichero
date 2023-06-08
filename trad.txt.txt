@@ -1,0 +1,245 @@
+int fs_write(int fildes, void *buf, size_t nbyte)
+{
+    if(nbyte <= 0 || !fd_table[fildes].used) {
+        return -1;
+    }
+
+    int i = 0;
+    char *src = buf;
+    char block[BLOCK_SIZE] = "";
+    char file_index = fd_table[fildes].file;
+    file_info* file = &dir_info[file_index];
+    int block_index = file->head;
+    int size = file->size;
+    int block_count = 0;
+    int offset = fd_table[fildes].offset;
+
+    //carga fichero actual
+    while (offset >= BLOCK_SIZE){
+        block_index = find_next_block(block_index, file_index);
+        block_count++;
+        offset -= BLOCK_SIZE;
+    }
+
+    int write_count = 0;
+    if (block_index != -1){
+        //escribe fichero actual
+        block_read(block_index, block);
+        for(i = offset; i < BLOCK_SIZE; i++) {
+            block[i] = src[write_count++];
+            if (write_count == (int)nbyte || write_count == strlen(src)) {
+                block_write(block_index, block);
+                fd_table[fildes].offset += write_count;
+                if(size < fd_table[fildes].offset){
+                    file->size = fd_table[fildes].offset;
+                }
+                return write_count;
+            }
+        }
+        block_write(block_index, block);
+        block_count++;
+    }
+
+    //escribe los bloques actuales
+    strcpy(block, "");
+    while(write_count < (int)nbyte && write_count < strlen(src) && block_count < file->num_blocks) {
+        block_index = find_next_block(block_index, file_index);
+        for(i = 0; i < BLOCK_SIZE; i++) {
+            block[i] = src[write_count++];
+            if(write_count == (int)nbyte || write_count == strlen(src)) {
+                block_write(block_index, block);
+                fd_table[fildes].offset += write_count;
+                if(size < fd_table[fildes].offset){
+                    file->size = fd_table[fildes].offset;
+                }
+                return write_count;
+            }
+        }
+        block_write(block_index, block);
+        block_count++;
+    }
+
+    //escribe todos los bloques
+    strcpy(block, "");
+    while(write_count < (int)nbyte && write_count < strlen(src)) {
+        block_index = find_free_block(file_index);
+        file->num_blocks++;
+        if (file->head == -1){
+            file->head = block_index;
+        }
+        if (block_index < 0){
+            fprintf(stderr, "fs_write()\t error: no hay bloques disponibles.\n");
+            return -1;
+        }
+        for(i = 0; i < BLOCK_SIZE; i++) {
+            block[i] = src[write_count++];
+            if(write_count == (int)nbyte || write_count == strlen(src)) {
+                block_write(block_index, block);
+                fd_table[fildes].offset += write_count;
+                if(size < fd_table[fildes].offset){
+                    file->size = fd_table[fildes].offset;
+                }
+                return write_count;
+            }
+        }
+        block_write(block_index, block);
+    }
+
+    fd_table[fildes].offset += write_count;
+    if(size < fd_table[fildes].offset){
+        file->size = fd_table[fildes].offset;
+    }
+    return write_count;
+}
+
+int fs_get_filesize(int fildes){
+    if(!fd_table[fildes].used){
+        fprintf(stderr, "fs_get_filesize()\t error: descriptor de fichero no valido.\n");
+        return -1;
+    }
+    return dir_info[fd_table[fildes].file].size;
+}
+
+int fs_lseek(int fildes, off_t offset)
+{
+    if (offset > dir_info[fd_table[fildes].file].size || offset < 0){
+        fprintf(stderr, "fs_lseek()\t error: offset fuera de los limites.\n");
+        return -1;
+    } else if(!fd_table[fildes].used){
+        fprintf(stderr, "fs_lseek()\t error: descriptor de fichero invalido\n");
+        return -1;
+    } else {
+        fd_table[fildes].offset = (int)offset;
+        printf("fs_lseek()\t realizado\n");
+        return 0;
+    }
+}
+
+int fs_truncate(int fildes, off_t length)
+{
+    char file_index = fd_table[fildes].file;
+    file_info* file  = &dir_info[file_index];
+
+    if(!fd_table[fildes].used){
+        fprintf(stderr, "fs_truncate()\t error: descriptor de fichero no valido.\n");
+        return -1;
+    }
+
+    if (length > file->size || length < 0) {
+        fprintf(stderr, "fs_truncate()\t error: rango de offset fuera del limite\n");
+        return -1;
+    }
+
+    //bloques libres
+    int new_block_num = (int) (length + BLOCK_SIZE - 1) / BLOCK_SIZE;
+    int i;
+    int block_index = file->head;
+    for (i = 0; i < new_block_num; ++i) {
+        block_index = find_next_block(block_index, file_index);
+    }
+    while (block_index > 0){
+        char buf[BLOCK_SIZE] = "";
+        if (block_index < BLOCK_SIZE){
+            block_read(super_block_ptr->data_index, buf);
+            buf[block_index] = '\0';
+            block_write(super_block_ptr->data_index, buf);
+        } else {
+            block_read(super_block_ptr->data_index + 1, buf);
+            buf[block_index - BLOCK_SIZE] = '\0';
+            block_write(super_block_ptr->data_index + 1, buf);
+        }
+        block_index = find_next_block(block_index, file_index);
+    }
+
+    //actualizamos informacion de fichero
+    file->size = (int)length;
+    file->num_blocks = new_block_num;
+
+    
+    for(i = 0; i < MAX_FILE_DESCRIPTOR; i++) {
+        if(fd_table[i].used == true && fd_table[i].file == file_index) {
+            fd_table[i].offset = (int)length;
+        }
+    }
+    printf("fs_truncate() realizado\n");
+    return 0;
+}
+
+char find_file(char* name)
+{
+    char i;
+
+    for(i = 0; i < MAX_FILE; i++) {
+        if(dir_info[i].used == 1 && strcmp(dir_info[i].name, name) == 0) {
+            return i;  //retorna el index
+        }
+    }
+
+    return -1;         // file not found
+}
+
+int find_free_file_des(char file_index)
+{
+    int i;
+
+    for(i = 0; i < MAX_FILE_DESCRIPTOR; i++) {
+        if(fd_table[i].used == false) {
+            fd_table[i].used = true;
+            fd_table[i].file = file_index;
+            fd_table[i].offset = 0;
+            return i;  //devuelve indice del descriptor de fichero
+        }
+    }
+
+    fprintf(stderr, "find_free_file_des()\t error: no hay descriptor de fichero disponible.\n");
+    return -1;         
+}
+
+int find_free_block(char file_index)
+{
+    char buf1[BLOCK_SIZE] = "";
+    char buf2[BLOCK_SIZE] = "";
+    block_read(super_block_ptr->data_index, buf1);
+    block_read(super_block_ptr->data_index + 1, buf2);
+    int i;
+
+    for(i = 4; i < BLOCK_SIZE; i++) {
+        if(buf1[i] == '\0') {
+            buf1[i] = (char)(file_index + 1);
+            block_write(super_block_ptr->data_index, buf1);
+            return i;  // retorna numero de bloque
+        }
+    }
+    for(i = 0; i < BLOCK_SIZE; i++) {
+        if(buf2[i] == '\0') {
+            buf2[i] = (char)(file_index + 1);
+            block_write(super_block_ptr->data_index, buf2);
+            return i;  //devuelve numero de bloque
+        }
+    }
+    fprintf(stderr, "find_free_block()\t error: no hay bloque disponible\n");
+    return -1;        
+}
+
+int find_next_block(int current, char file_index){
+    char buf[BLOCK_SIZE] = "";
+    int i;
+
+    if (current < BLOCK_SIZE){
+        block_read(super_block_ptr->data_index, buf);
+        for(i = current + 1; i < BLOCK_SIZE; i++) {
+            if (buf[i] == (file_index + 1)){
+                return i;
+            }
+        }
+    } else {
+        block_read(super_block_ptr->data_index + 1, buf);
+        for(i = current - BLOCK_SIZE + 1; i < BLOCK_SIZE; i++) {
+            if (buf[i] == (file_index + 1)){
+                return i + BLOCK_SIZE;
+            }
+        }
+    }
+
+    return -1; // no next block
+}
