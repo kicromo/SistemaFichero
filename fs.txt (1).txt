@@ -1,0 +1,139 @@
+int fs_read(int fildes, void *buf, size_t nbyte)
+{
+    if(nbyte <= 0 || !fd_table[fildes].used) {
+        return -1;
+    }
+
+    int i, j = 0;
+    char *dst = buf;
+    char block[BLOCK_SIZE] = "";
+    char file_index = fd_table[fildes].file;
+    file_info* file = &dir_info[file_index];
+    int block_index = file->head;
+    int block_count = 0;
+    int offset = fd_table[fildes].offset;
+
+    //carga el fichero actual
+    while (offset >= BLOCK_SIZE){
+        block_index = find_next_block(block_index, file_index);
+        block_count++;
+        offset -= BLOCK_SIZE;
+    }
+    block_read(block_index, block);
+
+    //lee el siguiente fichero
+    int read_count = 0;
+    for(i = offset; i < BLOCK_SIZE; i++) {
+        dst[read_count++] = block[i];
+        if(read_count == (int)nbyte) {
+            fd_table[fildes].offset += read_count;
+            return read_count;
+        }
+    }
+    block_count++;
+
+    //lee siguientes bloques
+    strcpy(block,"");
+    while(read_count < (int)nbyte && block_count <= file->num_blocks) {
+        block_index = find_next_block(block_index, file_index);
+        strcpy(block,"");
+        block_read(block_index, block);
+        for(j=0; j < BLOCK_SIZE; j++, i++) {
+            dst[read_count++] = block[j];
+            if(read_count == (int)nbyte ) {
+                fd_table[fildes].offset += read_count;
+                return read_count;
+            }
+        }
+        block_count++;
+    }
+    fd_table[fildes].offset += read_count;
+    return read_count;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+int fs_read(int fildes, void *buf, size_t nbyte)
+{
+    if(nbyte <= 0 || !fd_table[fildes].used) {
+        return -1;
+    }
+
+    int i, j = 0;
+    char *dst = buf;
+    char block[BLOCK_SIZE] = "";
+    char file_index = fd_table[fildes].file;
+    file_info* file = &dir_info[file_index];
+    int block_index = file->head;
+    int block_count = 0;
+    int offset = fd_table[fildes].offset;
+
+    //carga el fichero actual
+    while (offset >= BLOCK_SIZE){
+        block_index = find_next_block(block_index, file_index);
+        block_count++;
+        offset -= BLOCK_SIZE;
+    }
+    block_read(block_index, block);
+
+    //lee el siguiente fichero
+    int read_count = 0;
+    for(i = offset; i < BLOCK_SIZE; i++) {
+        dst[read_count++] = block[i];
+        if(read_count == (int)nbyte) {
+            fd_table[fildes].offset += read_count;
+            return read_count;
+        }
+    }
+    block_count++;
+
+    //lee siguientes bloques
+    strcpy(block,"");
+    while(read_count < (int)nbyte && block_count <= file->num_blocks) {
+        block_index = find_next_block(block_index, file_index);
+        strcpy(block,"");
+        block_read(block_index, block);
+        for(j=0; j < BLOCK_SIZE; j++, i++) {
+            dst[read_count++] = block[j];
+            if(read_count == (int)nbyte ) {
+                fd_table[fildes].offset += read_count;
+                return read_count;
+            }
+        }
+        block_count++;
+    }
+    fd_table[fildes].offset += read_count;
+    return read_count;
+}
